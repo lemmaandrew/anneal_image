@@ -1,7 +1,0 @@
-/home/lemma/Documents/programs/test_chambers/test_rust/target/debug/deps/strsim-e66c98b9cb6025e2.rmeta: /home/lemma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/strsim-0.10.0/src/lib.rs
-
-/home/lemma/Documents/programs/test_chambers/test_rust/target/debug/deps/libstrsim-e66c98b9cb6025e2.rlib: /home/lemma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/strsim-0.10.0/src/lib.rs
-
-/home/lemma/Documents/programs/test_chambers/test_rust/target/debug/deps/strsim-e66c98b9cb6025e2.d: /home/lemma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/strsim-0.10.0/src/lib.rs
-
-/home/lemma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/strsim-0.10.0/src/lib.rs:
