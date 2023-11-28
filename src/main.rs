@@ -3,7 +3,6 @@ use rand::random;
 use std::env;
 
 /// Draws a random single colored rectangle on the image at given coordinates.
-/// Returns the slice of the original rectangle
 fn draw_rectangle(
     image: &mut ImageBuffer<Rgb<u8>, Vec<u8>>,
     top_left: (u32, u32),
@@ -23,6 +22,8 @@ fn get_neighbor(
 ) -> (ImageBuffer<Rgb<u8>, Vec<u8>>, ((u32, u32), (u32, u32))) {
     let (w, h) = image.dimensions();
     let bottom_right = (random::<u32>() % (w + 1), random::<u32>() % (h + 1));
+    // if `bottom_right` contains any 0s, we must account for that
+    // because we can't perform `n % 0`
     let top_left = match bottom_right {
         (0, 0) => (0, 0),
         (0, y2) => (0, random::<u32>() % y2),
@@ -77,9 +78,11 @@ fn update_cost(
     bottom_right: (u32, u32),
 ) -> f64 {
     let (w, h) = original_image.dimensions();
+    // restoring the sum from `get_cost`
     let mut s = (previous_cost * previous_cost * (w * h * 3) as f64)
         .sqrt()
         .round() as u64;
+    // subtracting off the relevant pixels from the first generated image
     for x in top_left.0..bottom_right.0 {
         for y in top_left.1..bottom_right.1 {
             s -= pixel_difference(
@@ -88,6 +91,7 @@ fn update_cost(
             );
         }
     }
+    // adding in the relevant pixels from the second generated image
     for x in top_left.0..bottom_right.0 {
         for y in top_left.1..bottom_right.1 {
             s += pixel_difference(
@@ -96,10 +100,12 @@ fn update_cost(
             );
         }
     }
+    // recalculating the distance
     let dist = ((s as f64 * s as f64) / ((w * h * 3) as f64)).sqrt();
     dist
 }
 
+/// Simulated annealing algorithm to approximate a given image
 fn anneal(
     original_image: &ImageBuffer<Rgb<u8>, Vec<u8>>,
     alpha: f64,
