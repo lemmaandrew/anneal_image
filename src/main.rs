@@ -37,10 +37,11 @@ fn get_neighbor(
 }
 
 /// Difference between two pixels as a single value
-fn pixel_difference(pixel1: Rgb<u8>, pixel2: Rgb<u8>) -> i32 {
+fn pixel_difference(pixel1: Rgb<u8>, pixel2: Rgb<u8>) -> u64 {
     let [r1, g1, b1] = pixel1.0;
     let [r2, g2, b2] = pixel2.0;
-    (r1 as i32 - r2 as i32).abs() + (g1 as i32 - g2 as i32).abs() + (b1 as i32 - b2 as i32).abs()
+    ((r1 as i32 - r2 as i32).abs() + (g1 as i32 - g2 as i32).abs() + (b1 as i32 - b2 as i32).abs())
+        as u64
 }
 
 /// RMSE difference between the original image and the generated image
@@ -78,7 +79,7 @@ fn update_cost(
     let (w, h) = original_image.dimensions();
     let mut s = (previous_cost * previous_cost * (w * h * 3) as f64)
         .sqrt()
-        .round() as i32;
+        .round() as u64;
     for x in top_left.0..bottom_right.0 {
         for y in top_left.1..bottom_right.1 {
             s -= pixel_difference(
