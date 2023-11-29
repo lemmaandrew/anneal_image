@@ -18,7 +18,7 @@ fn draw_triangle(
         c: Rgb<u8>,
     ) -> Vec<((u32, u32), Rgb<u8>)> {
         let mut original_row = Vec::new();
-        for x in x1..x2 {
+        for x in x1..=x2 {
             original_row.push(((x, y), *im.get_pixel(x, y)));
             im.put_pixel(x, y, c);
         }
@@ -26,7 +26,7 @@ fn draw_triangle(
     }
 
     fn fill_flat_bottom_triangle(
-        [v1, v2, v3]: &[(u32, u32); 3],
+        [v1, v2, v3]: &[(i64, i64); 3],
         im: &mut ImageBuffer<Rgb<u8>, Vec<u8>>,
         c: Rgb<u8>,
     ) -> Vec<((u32, u32), Rgb<u8>)> {
@@ -36,7 +36,13 @@ fn draw_triangle(
         let mut curx2 = v1.0 as f64;
         let mut original_values = Vec::new();
         for y in v1.1..=v2.1 {
-            original_values.extend(draw_horizontal_line(curx1 as u32, curx2 as u32, y, im, c));
+            original_values.extend(draw_horizontal_line(
+                curx1 as u32,
+                curx2 as u32,
+                y as u32,
+                im,
+                c,
+            ));
             curx1 += invslope1;
             curx2 += invslope2;
         }
@@ -45,7 +51,7 @@ fn draw_triangle(
     }
 
     fn fill_flat_top_triangle(
-        [v1, v2, v3]: &[(u32, u32); 3],
+        [v1, v2, v3]: &[(i64, i64); 3],
         im: &mut ImageBuffer<Rgb<u8>, Vec<u8>>,
         c: Rgb<u8>,
     ) -> Vec<((u32, u32), Rgb<u8>)> {
@@ -54,8 +60,14 @@ fn draw_triangle(
         let mut curx1 = v3.0 as f64;
         let mut curx2 = v3.0 as f64;
         let mut original_values = Vec::new();
-        for y in (v1.1..=v3.1).rev() {
-            original_values.extend(draw_horizontal_line(curx1 as u32, curx2 as u32, y, im, c));
+        for y in (v1.1 + 1..=v3.1).rev() {
+            original_values.extend(draw_horizontal_line(
+                curx1 as u32,
+                curx2 as u32,
+                y as u32,
+                im,
+                c,
+            ));
             curx1 -= invslope1;
             curx2 -= invslope2;
         }
@@ -63,23 +75,35 @@ fn draw_triangle(
         original_values
     }
 
-    vertices.sort_by(|v1, v2| v1.1.cmp(&v2.1));
+    vertices.sort_by_key(|v| (v.1, v.0));
+    let vt1 = (vertices[0].0 as i64, vertices[0].1 as i64);
+    let vt2 = (vertices[1].0 as i64, vertices[1].1 as i64);
+    let vt3 = (vertices[2].0 as i64, vertices[2].1 as i64);
     let color: Rgb<u8> = Rgb([random(), random(), random()]);
 
-    if vertices[1].1 == vertices[2].1 {
-        (fill_flat_bottom_triangle(&vertices, image, color), color)
-    } else if vertices[0].1 == vertices[1].1 {
-        (fill_flat_top_triangle(&vertices, image, color), color)
+    if vt2.1 == vt3.1 {
+        (
+            fill_flat_bottom_triangle(&[vt1, vt2, vt3], image, color),
+            color,
+        )
+    } else if vt1.1 == vt2.1 {
+        (
+            fill_flat_top_triangle(&[vt1, vt2, vt3], image, color),
+            color,
+        )
     } else {
         // splitting triangle into top half and bottom half
         let mut original_values = Vec::new();
-        let [vt1, vt2, vt3] = vertices;
         let x4 = (vt1.0 as f64
             + ((vt2.1 - vt1.1) as f64 / (vt3.1 - vt1.1) as f64) * (vt3.0 - vt1.0) as f64)
-            as u32;
+            as i64;
         let vt4 = (x4, vt2.1);
-        original_values.extend(fill_flat_bottom_triangle(&[*vt1, *vt2, vt4], image, color));
-        original_values.extend(fill_flat_top_triangle(&[*vt2, vt4, *vt3], image, color));
+        let mut flat_bottom = [vt1, vt2, vt4];
+        flat_bottom.sort_by_key(|v| (v.1, v.0));
+        let mut flat_top = [vt2, vt4, vt3];
+        flat_top.sort_by_key(|v| (v.1, v.0));
+        original_values.extend(fill_flat_bottom_triangle(&flat_bottom, image, color));
+        original_values.extend(fill_flat_top_triangle(&flat_top, image, color));
         (original_values, color)
     }
 }
@@ -106,21 +130,39 @@ fn draw_rectangle(
 /// Returns the color and the top-left and bottom-right vertices of the rectangle
 fn get_neighbor(
     image: &mut ImageBuffer<Rgb<u8>, Vec<u8>>,
+    triangle: bool,
 ) -> (Vec<((u32, u32), Rgb<u8>)>, Rgb<u8>) {
     let (w, h) = image.dimensions();
-    let bottom_right = (random::<u32>() % (w + 1), random::<u32>() % (h + 1));
-    // if `bottom_right` contains any 0s, we must account for that
-    // because we can't perform `n % 0`
-    let top_left = match bottom_right {
-        (0, 0) => (0, 0),
-        (0, y2) => (0, random::<u32>() % y2),
-        (x2, 0) => (random::<u32>() % x2, 0),
-        _ => (
-            random::<u32>() % bottom_right.0,
-            random::<u32>() % bottom_right.1,
-        ),
-    };
-    draw_rectangle(image, top_left, bottom_right)
+    if !triangle {
+        let bottom_right = (random::<u32>() % (w + 1), random::<u32>() % (h + 1));
+        // if `bottom_right` contains any 0s, we must account for that
+        // because we can't perform `n % 0`
+        let top_left = match bottom_right {
+            (0, 0) => (0, 0),
+            (0, y2) => (0, random::<u32>() % y2),
+            (x2, 0) => (random::<u32>() % x2, 0),
+            _ => (
+                random::<u32>() % bottom_right.0,
+                random::<u32>() % bottom_right.1,
+            ),
+        };
+        draw_rectangle(image, top_left, bottom_right)
+    } else {
+        let v1 = (random::<u32>() % w, random::<u32>() % h);
+        let v2 = (random::<u32>() % w, random::<u32>() % h);
+        let v3 = (random::<u32>() % w, random::<u32>() % h);
+        // ensuring we have a valid triangle
+        if v1 == v2
+            || v2 == v3
+            || v1 == v3
+            || v1.0 == v2.0 && v2.0 == v3.0
+            || v1.1 == v2.1 && v2.1 == v3.1
+        {
+            get_neighbor(image, triangle)
+        } else {
+            draw_triangle(image, &mut [v1, v2, v3])
+        }
+    }
 }
 
 /// Difference between two pixels as a single value
@@ -163,44 +205,20 @@ fn update_cost(
 ) -> f64 {
     let (w, h) = original_image.dimensions();
     // restoring the sum from `get_cost`
-    let mut s = (previous_cost * previous_cost * (w * h * 3) as f64)
-        .sqrt()
-        .round() as u64;
+    let mut s = (previous_cost * previous_cost * (w * h * 3) as f64).sqrt();
     // subtracting off the relevant pixels from the first generated image.
     // also storing `original_image`'s pixels so we don't have to fetch them again
     // because apparently `get_pixel` is an expensive operation??
     let mut original_pixels = Vec::new();
     for ((x, y), old_pixel) in old_values.iter() {
         let original_pixel = *original_image.get_pixel(*x, *y);
-        s -= pixel_difference(original_pixel, *old_pixel);
+        s -= pixel_difference(original_pixel, *old_pixel) as f64;
         original_pixels.push(original_pixel);
     }
-    /*
-    for x in top_left.0..bottom_right.0 {
-        let mut column = Vec::new();
-        for y in top_left.1..bottom_right.1 {
-            let original_pixel = *original_image.get_pixel(x, y);
-            let old_pixel = old_pixels[(x - top_left.0) as usize][(y - top_left.1) as usize];
-            s -= pixel_difference(original_pixel, old_pixel);
-            column.push(original_pixel);
-        }
-        original_pixels.push(column);
-    }
-    */
     // adding in the relevant pixels from the second generated image
     for pixel in original_pixels.iter() {
-        s += pixel_difference(*pixel, new_color);
+        s += pixel_difference(*pixel, new_color) as f64;
     }
-    /*
-    for x in top_left.0..bottom_right.0 {
-        for y in top_left.1..bottom_right.1 {
-            s += pixel_difference(
-                original_pixels[(x - top_left.0) as usize][(y - top_left.1) as usize],
-                new_color,
-            );
-        }
-    }
-    */
     // recalculating the distance
     let dist = ((s as f64 * s as f64) / ((w * h * 3) as f64)).sqrt();
     dist
@@ -210,6 +228,7 @@ fn update_cost(
 fn anneal(
     original_image: &ImageBuffer<Rgb<u8>, Vec<u8>>,
     alpha: f64,
+    triangle: bool,
 ) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
     let initial_temp = 1e3;
     let final_temp = 0.001;
@@ -219,13 +238,8 @@ fn anneal(
 
     let total_time_start = Instant::now();
     while current_temp >= final_temp {
-        let (old_values, new_color) = get_neighbor(&mut image);
-        let neighbor_cost = update_cost(
-            cost,
-            original_image,
-            &old_values,
-            new_color,
-        );
+        let (old_values, new_color) = get_neighbor(&mut image, triangle);
+        let neighbor_cost = update_cost(cost, original_image, &old_values, new_color);
         let cost_diff = neighbor_cost - cost;
         if cost_diff < 0.0 {
             cost = neighbor_cost;
@@ -262,11 +276,15 @@ struct Args {
     /// Temperature change value
     #[arg(short, long, default_value_t = 0.999)]
     alpha: f64,
+
+    /// Flag for drawing triangles instead of rectangles
+    #[arg(short, long)]
+    triangle: bool,
 }
 
 fn main() {
     let args = Args::parse();
     let original_image = open(args.input).unwrap().into_rgb8();
-    let generated_image = anneal(&original_image, args.alpha);
+    let generated_image = anneal(&original_image, args.alpha, args.triangle);
     generated_image.save(args.output).unwrap();
 }
