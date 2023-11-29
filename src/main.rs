@@ -1,6 +1,6 @@
+use clap::Parser;
 use image::{open, ImageBuffer, Rgb, RgbImage};
 use rand::random;
-use std::env;
 use std::time::Instant;
 
 /// Draws a random single colored rectangle on the image at given coordinates.
@@ -158,9 +158,7 @@ fn anneal(
             }
         }
         current_temp *= alpha;
-        print!(
-            "temperature: {current_temp}\r",
-        );
+        print!("temperature: {current_temp}\r",);
     }
 
     let total_time_elapsed = total_time_start.elapsed();
@@ -171,15 +169,24 @@ fn anneal(
     image
 }
 
+#[derive(Parser)]
+struct Args {
+    /// Input image path
+    #[arg(short, long)]
+    input: String,
+
+    /// Output image path
+    #[arg(short, long)]
+    output: String,
+
+    /// Temperature change value
+    #[arg(short, long, default_value_t = 0.999)]
+    alpha: f64,
+}
+
 fn main() {
-    let args = env::args().collect::<Vec<String>>();
-    let path = args[1].clone();
-    let dest = args[2].clone();
-    let alpha = match args.get(3) {
-        Some(a) => a.parse().unwrap(),
-        None => 0.999,
-    };
-    let original_image = open(path).unwrap().into_rgb8();
-    let generated_image = anneal(&original_image, alpha);
-    generated_image.save(dest).unwrap();
+    let args = Args::parse();
+    let original_image = open(args.input).unwrap().into_rgb8();
+    let generated_image = anneal(&original_image, args.alpha);
+    generated_image.save(args.output).unwrap();
 }
