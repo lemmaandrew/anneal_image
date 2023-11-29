@@ -1,7 +1,8 @@
 use clap::Parser;
 use image::{open, ImageBuffer, Rgb, RgbImage};
 use rand::random;
-use std::time::Instant;
+use rayon::prelude::*;
+use std::{iter::zip, time::Instant};
 
 /// Draws a random single-colored triangle on the image with the given vertices.
 /// Returns the pixels that were modified (coordinates and original colors) and the random color.
@@ -209,16 +210,19 @@ fn update_cost(
     // subtracting off the relevant pixels from the first generated image.
     // also storing `original_image`'s pixels so we don't have to fetch them again
     // because apparently `get_pixel` is an expensive operation??
-    let mut original_pixels = Vec::new();
-    for ((x, y), old_pixel) in old_values.iter() {
-        let original_pixel = *original_image.get_pixel(*x, *y);
-        s -= pixel_difference(original_pixel, *old_pixel) as f64;
-        original_pixels.push(original_pixel);
-    }
+    let original_pixels = old_values
+        .par_iter()
+        .map(|((x, y), _)| *original_image.get_pixel(*x, *y))
+        .collect::<Vec<Rgb<u8>>>();
+    s -= (0..original_pixels.len())
+        .into_par_iter()
+        .map(|i| pixel_difference(original_pixels[i], old_values[i].1) as f64)
+        .sum::<f64>();
     // adding in the relevant pixels from the second generated image
-    for pixel in original_pixels.iter() {
-        s += pixel_difference(*pixel, new_color) as f64;
-    }
+    s += original_pixels
+        .par_iter()
+        .map(|pixel| pixel_difference(*pixel, new_color) as f64)
+        .sum::<f64>();
     // recalculating the distance
     let dist = ((s as f64 * s as f64) / ((w * h * 3) as f64)).sqrt();
     dist
