@@ -228,9 +228,9 @@ fn update_cost(
                 .sum::<f64>();
         }
         Some(n) => {
-            let sample_indices = (0..n)
-                .map(|_| random::<usize>() % old_values.len())
-                .collect::<Vec<usize>>();
+            // getting a linspace of indices to sample from
+            let dx = (old_values.len() - 1) as f64 / (n - 1) as f64;
+            let sample_indices = (0..n).map(|i| (i as f64 * dx) as usize).collect::<Vec<usize>>();
             let original_pixels_sample = if (n as usize) < old_values.len() {
                 sample_indices
                     .iter()
