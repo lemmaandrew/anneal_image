@@ -203,26 +203,44 @@ fn update_cost(
     original_image: &ImageBuffer<Rgb<u8>, Vec<u8>>,
     old_values: &Vec<((u32, u32), Rgb<u8>)>,
     new_color: Rgb<u8>,
+    sample: Option<u32>,
 ) -> f64 {
     let (w, h) = original_image.dimensions();
     // restoring the sum from `get_cost`
     let mut s = (previous_cost * previous_cost * (w * h * 3) as f64).sqrt();
-    // subtracting off the relevant pixels from the first generated image.
-    // also storing `original_image`'s pixels so we don't have to fetch them again
+    // storing `original_image`'s pixels so we don't have to fetch them again
     // because apparently `get_pixel` is an expensive operation??
     let original_pixels = old_values
         .par_iter()
         .map(|((x, y), _)| *original_image.get_pixel(*x, *y))
         .collect::<Vec<Rgb<u8>>>();
-    s -= (0..original_pixels.len())
-        .into_par_iter()
-        .map(|i| pixel_difference(original_pixels[i], old_values[i].1) as f64)
-        .sum::<f64>();
-    // adding in the relevant pixels from the second generated image
-    s += original_pixels
-        .par_iter()
-        .map(|pixel| pixel_difference(*pixel, new_color) as f64)
-        .sum::<f64>();
+    match sample {
+        None => {
+            // subtracting off the relevant pixels from the first generated image.
+            s -= (0..original_pixels.len())
+                .into_par_iter()
+                .map(|i| pixel_difference(original_pixels[i], old_values[i].1) as f64)
+                .sum::<f64>();
+            // adding in the relevant pixels from the second generated image
+            s += original_pixels
+                .par_iter()
+                .map(|pixel| pixel_difference(*pixel, new_color) as f64)
+                .sum::<f64>();
+        }
+        Some(n) => {
+            let sample_indices = (0..n)
+                .map(|_| random::<usize>() % original_pixels.len())
+                .collect::<Vec<usize>>();
+            s -= sample_indices
+                .iter()
+                .map(|i| pixel_difference(original_pixels[*i], old_values[*i].1) as f64)
+                .sum::<f64>();
+            s += sample_indices
+                .iter()
+                .map(|i| pixel_difference(original_pixels[*i], new_color) as f64)
+                .sum::<f64>();
+        }
+    }
     // recalculating the distance
     let dist = ((s as f64 * s as f64) / ((w * h * 3) as f64)).sqrt();
     dist
@@ -233,6 +251,7 @@ fn anneal(
     original_image: &ImageBuffer<Rgb<u8>, Vec<u8>>,
     alpha: f64,
     triangle: bool,
+    sample: Option<u32>,
 ) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
     let initial_temp = 1e3;
     let final_temp = 0.001;
@@ -243,7 +262,7 @@ fn anneal(
     let total_time_start = Instant::now();
     while current_temp >= final_temp {
         let (old_values, new_color) = get_neighbor(&mut image, triangle);
-        let neighbor_cost = update_cost(cost, original_image, &old_values, new_color);
+        let neighbor_cost = update_cost(cost, original_image, &old_values, new_color, sample);
         let cost_diff = neighbor_cost - cost;
         if cost_diff < 0.0 {
             cost = neighbor_cost;
@@ -284,11 +303,16 @@ struct Args {
     /// Flag for drawing triangles instead of rectangles
     #[arg(short, long)]
     triangle: bool,
+
+    /// Randomly sample pixels for cost calculation.
+    /// Much faster than non-sampled, at the cost of loss of accuracy
+    #[arg(short, long)]
+    sample: Option<u32>,
 }
 
 fn main() {
     let args = Args::parse();
     let original_image = open(args.input).unwrap().into_rgb8();
-    let generated_image = anneal(&original_image, args.alpha, args.triangle);
+    let generated_image = anneal(&original_image, args.alpha, args.triangle, args.sample);
     generated_image.save(args.output).unwrap();
 }
