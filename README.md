@@ -1,7 +1,7 @@
 # anneal_image
 Tool that uses simulated annealing to recreate images
 
-Usage: `cargo run -- --input input\_image.extension --output output\_image.extension [--alpha alpha] [--triangle]`
+Usage: `cargo run -- --input input-image.extension --output output-image.extension [--alpha alpha] [--triangle]`
 
 `alpha` is an optional argument (defaults to 0.999) which determines the rate at which the
 program's "temperature" changes. Values close to 1 will cause the temperature to decrease slowly,
