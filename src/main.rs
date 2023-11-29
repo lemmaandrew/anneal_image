@@ -231,17 +231,31 @@ fn update_cost(
             let sample_indices = (0..n)
                 .map(|_| random::<usize>() % old_values.len())
                 .collect::<Vec<usize>>();
-            let original_pixels_sample = sample_indices
-                .iter()
-                .map(|&i| {
-                    let ((x, y), _) = old_values[i];
-                    *original_image.get_pixel(x, y)
-                })
-                .collect::<Vec<Rgb<u8>>>();
-            let old_pixels_sample = sample_indices
-                .iter()
-                .map(|&i| old_values[i].1)
-                .collect::<Vec<Rgb<u8>>>();
+            let original_pixels_sample = if n as usize > old_values.len() {
+                sample_indices
+                    .iter()
+                    .map(|&i| {
+                        let ((x, y), _) = old_values[i];
+                        *original_image.get_pixel(x, y)
+                    })
+                    .collect::<Vec<Rgb<u8>>>()
+            } else {
+                old_values[..n as usize]
+                    .iter()
+                    .map(|((x, y), _)| *original_image.get_pixel(*x, *y))
+                    .collect::<Vec<Rgb<u8>>>()
+            };
+            let old_pixels_sample = if n as usize > old_values.len() {
+                sample_indices
+                    .iter()
+                    .map(|&i| old_values[i].1)
+                    .collect::<Vec<Rgb<u8>>>()
+            } else {
+                old_values[..n as usize]
+                    .iter()
+                    .map(|(_, pixel)| *pixel)
+                    .collect::<Vec<Rgb<u8>>>()
+            };
             s -= zip(original_pixels_sample.clone(), old_pixels_sample)
                 .map(|(pixel1, pixel2)| pixel_difference(pixel1, pixel2) as f64)
                 .sum::<f64>();
