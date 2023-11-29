@@ -231,7 +231,7 @@ fn update_cost(
             let sample_indices = (0..n)
                 .map(|_| random::<usize>() % old_values.len())
                 .collect::<Vec<usize>>();
-            let original_pixels_sample = if n as usize > old_values.len() {
+            let original_pixels_sample = if (n as usize) < old_values.len() {
                 sample_indices
                     .iter()
                     .map(|&i| {
@@ -240,18 +240,18 @@ fn update_cost(
                     })
                     .collect::<Vec<Rgb<u8>>>()
             } else {
-                old_values[..n as usize]
+                old_values
                     .iter()
                     .map(|((x, y), _)| *original_image.get_pixel(*x, *y))
                     .collect::<Vec<Rgb<u8>>>()
             };
-            let old_pixels_sample = if n as usize > old_values.len() {
+            let old_pixels_sample = if (n as usize) < old_values.len() {
                 sample_indices
                     .iter()
                     .map(|&i| old_values[i].1)
                     .collect::<Vec<Rgb<u8>>>()
             } else {
-                old_values[..n as usize]
+                old_values
                     .iter()
                     .map(|(_, pixel)| *pixel)
                     .collect::<Vec<Rgb<u8>>>()
