@@ -2,7 +2,7 @@ use clap::Parser;
 use image::{open, ImageBuffer, Rgb, RgbImage};
 use rand::random;
 use rayon::prelude::*;
-use std::{iter::zip, time::Instant};
+use std::time::Instant;
 
 /// Draws a random single-colored triangle on the image with the given vertices.
 /// Returns the pixels that were modified (coordinates and original colors) and the random color.

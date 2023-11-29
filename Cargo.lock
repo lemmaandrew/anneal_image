@@ -15,6 +15,7 @@ dependencies = [
  "clap",
  "image",
  "rand",
+ "rayon",
 ]
 
 [[package]]
