@@ -2,7 +2,7 @@ use clap::Parser;
 use image::{open, ImageBuffer, Rgb, RgbImage};
 use rand::random;
 use rayon::prelude::*;
-use std::time::Instant;
+use std::{iter::zip, time::Instant};
 
 /// Draws a random single-colored triangle on the image with the given vertices.
 /// Returns the pixels that were modified (coordinates and original colors) and the random color.
@@ -208,14 +208,14 @@ fn update_cost(
     let (w, h) = original_image.dimensions();
     // restoring the sum from `get_cost`
     let mut s = (previous_cost * previous_cost * (w * h * 3) as f64).sqrt();
-    // storing `original_image`'s pixels so we don't have to fetch them again
-    // because apparently `get_pixel` is an expensive operation??
-    let original_pixels = old_values
-        .par_iter()
-        .map(|((x, y), _)| *original_image.get_pixel(*x, *y))
-        .collect::<Vec<Rgb<u8>>>();
     match sample {
         None => {
+            // storing `original_image`'s pixels so we don't have to fetch them again
+            // because apparently `get_pixel` is an expensive operation??
+            let original_pixels = old_values
+                .par_iter()
+                .map(|((x, y), _)| *original_image.get_pixel(*x, *y))
+                .collect::<Vec<Rgb<u8>>>();
             // subtracting off the relevant pixels from the first generated image.
             s -= (0..original_pixels.len())
                 .into_par_iter()
@@ -229,15 +229,25 @@ fn update_cost(
         }
         Some(n) => {
             let sample_indices = (0..n)
-                .map(|_| random::<usize>() % original_pixels.len())
+                .map(|_| random::<usize>() % old_values.len())
                 .collect::<Vec<usize>>();
-            s -= sample_indices
+            let original_pixels_sample = sample_indices
                 .iter()
-                .map(|i| pixel_difference(original_pixels[*i], old_values[*i].1) as f64)
+                .map(|&i| {
+                    let ((x, y), _) = old_values[i];
+                    *original_image.get_pixel(x, y)
+                })
+                .collect::<Vec<Rgb<u8>>>();
+            let old_pixels_sample = sample_indices
+                .iter()
+                .map(|&i| old_values[i].1)
+                .collect::<Vec<Rgb<u8>>>();
+            s -= zip(original_pixels_sample.clone(), old_pixels_sample)
+                .map(|(pixel1, pixel2)| pixel_difference(pixel1, pixel2) as f64)
                 .sum::<f64>();
-            s += sample_indices
+            s += original_pixels_sample
                 .iter()
-                .map(|i| pixel_difference(original_pixels[*i], new_color) as f64)
+                .map(|&pixel| pixel_difference(pixel, new_color) as f64)
                 .sum::<f64>();
         }
     }
