@@ -4,76 +4,38 @@ use rand::random;
 use rayon::prelude::*;
 use std::{iter::zip, time::Instant};
 
-/// Draws a random single-colored triangle on the image with the given vertices.
-/// Returns the pixels that were modified (coordinates and original colors) and the random color.
-/// Blatantly stolen from http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html
-fn draw_triangle(
-    image: &mut ImageBuffer<Rgb<u8>, Vec<u8>>,
-    vertices: &mut [(u32, u32); 3],
-) -> (Vec<((u32, u32), Rgb<u8>)>, Rgb<u8>) {
-    fn draw_horizontal_line(
-        x1: u32,
-        x2: u32,
-        y: u32,
-        im: &mut ImageBuffer<Rgb<u8>, Vec<u8>>,
-        c: Rgb<u8>,
-    ) -> Vec<((u32, u32), Rgb<u8>)> {
-        let mut original_row = Vec::new();
-        for x in x1..=x2 {
-            original_row.push(((x, y), *im.get_pixel(x, y)));
-            im.put_pixel(x, y, c);
-        }
-        original_row
-    }
-
-    fn fill_flat_bottom_triangle(
-        [v1, v2, v3]: &[(i64, i64); 3],
-        im: &mut ImageBuffer<Rgb<u8>, Vec<u8>>,
-        c: Rgb<u8>,
-    ) -> Vec<((u32, u32), Rgb<u8>)> {
+/// Gets the coordinates of a random single-colored triangle with the given vertices.
+/// Returns said coordinates and the random color that it should be filled with
+/// Algorithm stolen from http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html
+fn get_triangle(vertices: &mut [(u32, u32); 3]) -> (Vec<(u32, u32)>, Rgb<u8>) {
+    fn flat_bottom_triangle([v1, v2, v3]: &[(i64, i64); 3]) -> Vec<(u32, u32)> {
         let invslope1 = (v2.0 - v1.0) as f64 / (v2.1 - v1.1) as f64;
         let invslope2 = (v3.0 - v1.0) as f64 / (v3.1 - v1.1) as f64;
         let mut curx1 = v1.0 as f64;
         let mut curx2 = v1.0 as f64;
-        let mut original_values = Vec::new();
-        for y in v1.1..=v2.1 {
-            original_values.extend(draw_horizontal_line(
-                curx1 as u32,
-                curx2 as u32,
-                y as u32,
-                im,
-                c,
-            ));
+        let mut coords = Vec::new();
+        for y in v1.1..v2.1 {
+            coords.extend((curx1 as u32..=curx2 as u32).map(|x| (x, y as u32)));
             curx1 += invslope1;
             curx2 += invslope2;
         }
 
-        original_values
+        coords
     }
 
-    fn fill_flat_top_triangle(
-        [v1, v2, v3]: &[(i64, i64); 3],
-        im: &mut ImageBuffer<Rgb<u8>, Vec<u8>>,
-        c: Rgb<u8>,
-    ) -> Vec<((u32, u32), Rgb<u8>)> {
+    fn flat_top_triangle([v1, v2, v3]: &[(i64, i64); 3]) -> Vec<(u32, u32)> {
         let invslope1 = (v3.0 - v1.0) as f64 / (v3.1 - v1.1) as f64;
         let invslope2 = (v3.0 - v2.0) as f64 / (v3.1 - v2.1) as f64;
         let mut curx1 = v3.0 as f64;
         let mut curx2 = v3.0 as f64;
-        let mut original_values = Vec::new();
+        let mut coords = Vec::new();
         for y in (v1.1 + 1..=v3.1).rev() {
-            original_values.extend(draw_horizontal_line(
-                curx1 as u32,
-                curx2 as u32,
-                y as u32,
-                im,
-                c,
-            ));
+            coords.extend((curx1 as u32..=curx2 as u32).map(|x| (x, y as u32)));
             curx1 -= invslope1;
             curx2 -= invslope2;
         }
 
-        original_values
+        coords
     }
 
     vertices.sort_by_key(|v| (v.1, v.0));
@@ -83,18 +45,12 @@ fn draw_triangle(
     let color: Rgb<u8> = Rgb([random(), random(), random()]);
 
     if vt2.1 == vt3.1 {
-        (
-            fill_flat_bottom_triangle(&[vt1, vt2, vt3], image, color),
-            color,
-        )
+        (flat_bottom_triangle(&[vt1, vt2, vt3]), color)
     } else if vt1.1 == vt2.1 {
-        (
-            fill_flat_top_triangle(&[vt1, vt2, vt3], image, color),
-            color,
-        )
+        (flat_top_triangle(&[vt1, vt2, vt3]), color)
     } else {
         // splitting triangle into top half and bottom half
-        let mut original_values = Vec::new();
+        let mut coords = Vec::new();
         let x4 = (vt1.0 as f64
             + ((vt2.1 - vt1.1) as f64 / (vt3.1 - vt1.1) as f64) * (vt3.0 - vt1.0) as f64)
             as i64;
@@ -103,28 +59,23 @@ fn draw_triangle(
         flat_bottom.sort_by_key(|v| (v.1, v.0));
         let mut flat_top = [vt2, vt4, vt3];
         flat_top.sort_by_key(|v| (v.1, v.0));
-        original_values.extend(fill_flat_bottom_triangle(&flat_bottom, image, color));
-        original_values.extend(fill_flat_top_triangle(&flat_top, image, color));
-        (original_values, color)
+        coords.extend(flat_bottom_triangle(&flat_bottom));
+        coords.extend(flat_top_triangle(&flat_top));
+        (coords, color)
     }
 }
 
 /// Draws a random single-colored rectangle on the image at given coordinates.
 /// Returns the pixels that were modified (coordinates and original colors) and the random color.
-fn draw_rectangle(
-    image: &mut ImageBuffer<Rgb<u8>, Vec<u8>>,
-    top_left: (u32, u32),
-    bottom_right: (u32, u32),
-) -> (Vec<((u32, u32), Rgb<u8>)>, Rgb<u8>) {
+fn get_rectangle(top_left: (u32, u32), bottom_right: (u32, u32)) -> (Vec<(u32, u32)>, Rgb<u8>) {
     let color = Rgb([random(), random(), random()]);
-    let mut original_values = Vec::new();
+    let mut coords = Vec::new();
     for x in top_left.0..bottom_right.0 {
         for y in top_left.1..bottom_right.1 {
-            original_values.push(((x, y), *image.get_pixel(x, y)));
-            image.put_pixel(x, y, color);
+            coords.push((x, y));
         }
     }
-    (original_values, color)
+    (coords, color)
 }
 
 /// Draw a rectangle on the given image at a random location with a random color.
@@ -132,7 +83,7 @@ fn draw_rectangle(
 fn get_neighbor(
     image: &mut ImageBuffer<Rgb<u8>, Vec<u8>>,
     triangle: bool,
-) -> (Vec<((u32, u32), Rgb<u8>)>, Rgb<u8>) {
+) -> (Vec<(u32, u32)>, Rgb<u8>) {
     let (w, h) = image.dimensions();
     if !triangle {
         let bottom_right = (random::<u32>() % (w + 1), random::<u32>() % (h + 1));
@@ -147,7 +98,7 @@ fn get_neighbor(
                 random::<u32>() % bottom_right.1,
             ),
         };
-        draw_rectangle(image, top_left, bottom_right)
+        get_rectangle(top_left, bottom_right)
     } else {
         let v1 = (random::<u32>() % w, random::<u32>() % h);
         let v2 = (random::<u32>() % w, random::<u32>() % h);
@@ -161,7 +112,7 @@ fn get_neighbor(
         {
             get_neighbor(image, triangle)
         } else {
-            draw_triangle(image, &mut [v1, v2, v3])
+            get_triangle(&mut [v1, v2, v3])
         }
     }
 }
@@ -201,7 +152,8 @@ fn get_cost(
 fn update_cost(
     previous_cost: f64,
     original_image: &ImageBuffer<Rgb<u8>, Vec<u8>>,
-    old_values: &Vec<((u32, u32), Rgb<u8>)>,
+    annealed_image: &ImageBuffer<Rgb<u8>, Vec<u8>>,
+    coords: &Vec<(u32, u32)>,
     new_color: Rgb<u8>,
     sample: Option<u32>,
 ) -> f64 {
@@ -212,14 +164,18 @@ fn update_cost(
         None => {
             // storing `original_image`'s pixels so we don't have to fetch them again
             // because apparently `get_pixel` is an expensive operation??
-            let original_pixels = old_values
+            let original_pixels = coords
                 .par_iter()
-                .map(|((x, y), _)| *original_image.get_pixel(*x, *y))
+                .map(|(x, y)| *original_image.get_pixel(*x, *y))
+                .collect::<Vec<Rgb<u8>>>();
+            let annealed_pixels = coords
+                .par_iter()
+                .map(|(x, y)| *annealed_image.get_pixel(*x, *y))
                 .collect::<Vec<Rgb<u8>>>();
             // subtracting off the relevant pixels from the first generated image.
             s -= (0..original_pixels.len())
                 .into_par_iter()
-                .map(|i| pixel_difference(original_pixels[i], old_values[i].1) as f64)
+                .map(|i| pixel_difference(original_pixels[i], annealed_pixels[i]) as f64)
                 .sum::<f64>();
             // adding in the relevant pixels from the second generated image
             s += original_pixels
@@ -229,36 +185,45 @@ fn update_cost(
         }
         Some(n) => {
             // getting a linspace of indices to sample from
-            let dx = (old_values.len() - 1) as f64 / (n - 1) as f64;
-            let sample_indices = (0..n).map(|i| (i as f64 * dx) as usize).collect::<Vec<usize>>();
-            let original_pixels_sample = if (n as usize) < old_values.len() {
+            let dx = (coords.len() - 1) as f64 / (n - 1) as f64;
+            let sample_indices = (0..n)
+                .map(|i| (i as f64 * dx) as usize)
+                .collect::<Vec<usize>>();
+            // sampling the original image
+            let original_pixels_sample = if (n as usize) < coords.len() {
                 sample_indices
                     .iter()
                     .map(|&i| {
-                        let ((x, y), _) = old_values[i];
+                        let (x, y) = coords[i];
                         *original_image.get_pixel(x, y)
                     })
                     .collect::<Vec<Rgb<u8>>>()
             } else {
-                old_values
+                coords
                     .iter()
-                    .map(|((x, y), _)| *original_image.get_pixel(*x, *y))
+                    .map(|(x, y)| *original_image.get_pixel(*x, *y))
                     .collect::<Vec<Rgb<u8>>>()
             };
-            let old_pixels_sample = if (n as usize) < old_values.len() {
+            // sampling the old pixels
+            let annealed_sample = if (n as usize) < coords.len() {
                 sample_indices
                     .iter()
-                    .map(|&i| old_values[i].1)
+                    .map(|&i| {
+                        let (x, y) = coords[i];
+                        *annealed_image.get_pixel(x, y)
+                    })
                     .collect::<Vec<Rgb<u8>>>()
             } else {
-                old_values
+                coords
                     .iter()
-                    .map(|(_, pixel)| *pixel)
+                    .map(|(x, y)| *annealed_image.get_pixel(*x, *y))
                     .collect::<Vec<Rgb<u8>>>()
             };
-            s -= zip(original_pixels_sample.clone(), old_pixels_sample)
+            // subtracting off the pixel differences between the original image and the old pixels
+            s -= zip(original_pixels_sample.clone(), annealed_sample)
                 .map(|(pixel1, pixel2)| pixel_difference(pixel1, pixel2) as f64)
                 .sum::<f64>();
+            // adding back in the pixel differences between the original image andda the new color
             s += original_pixels_sample
                 .iter()
                 .map(|&pixel| pixel_difference(pixel, new_color) as f64)
@@ -285,17 +250,13 @@ fn anneal(
 
     let total_time_start = Instant::now();
     while current_temp >= final_temp {
-        let (old_values, new_color) = get_neighbor(&mut image, triangle);
-        let neighbor_cost = update_cost(cost, original_image, &old_values, new_color, sample);
+        let (coords, new_color) = get_neighbor(&mut image, triangle);
+        let neighbor_cost = update_cost(cost, original_image, &image, &coords, new_color, sample);
         let cost_diff = neighbor_cost - cost;
-        if cost_diff < 0.0 {
+        if cost_diff < 0.0 || random::<f64>() < (-cost_diff / current_temp).exp() {
             cost = neighbor_cost;
-        } else if random::<f64>() < (-cost_diff / current_temp).exp() {
-            cost = neighbor_cost;
-        } else {
-            // reset pixels to the old image pixels instead of neighbor pixels
-            for ((x, y), pixel) in old_values.iter() {
-                image.put_pixel(*x, *y, *pixel);
+            for (x, y) in coords.iter() {
+                image.put_pixel(*x, *y, new_color);
             }
         }
         current_temp *= alpha;
