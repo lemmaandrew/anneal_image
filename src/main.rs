@@ -157,6 +157,10 @@ fn update_cost(
     new_color: Rgb<u8>,
     sample: Option<u32>,
 ) -> f64 {
+    // if there is nothing to update, we just return the previous cost
+    if coords.len() == 0 {
+        return previous_cost;
+    }
     let (w, h) = original_image.dimensions();
     // restoring the sum from `get_cost`
     let mut s = (previous_cost * previous_cost * (w * h * 3) as f64).sqrt();
@@ -220,10 +224,10 @@ fn update_cost(
                     .collect::<Vec<Rgb<u8>>>()
             };
             // subtracting off the pixel differences between the original image and the old pixels
-            s -= zip(original_pixels_sample.clone(), annealed_sample)
-                .map(|(pixel1, pixel2)| pixel_difference(pixel1, pixel2) as f64)
+            s -= zip(original_pixels_sample.iter(), annealed_sample)
+                .map(|(pixel1, pixel2)| pixel_difference(*pixel1, pixel2) as f64)
                 .sum::<f64>();
-            // adding back in the pixel differences between the original image andda the new color
+            // adding back in the pixel differences between the original image and the new color
             s += original_pixels_sample
                 .iter()
                 .map(|&pixel| pixel_difference(pixel, new_color) as f64)
