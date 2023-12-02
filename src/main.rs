@@ -14,7 +14,7 @@ fn get_triangle(vertices: &mut [(u32, u32); 3]) -> (Vec<(u32, u32)>, Rgb<u8>) {
         let mut curx1 = v1.0 as f64;
         let mut curx2 = v1.0 as f64;
         let mut coords = Vec::new();
-        for y in v1.1..v2.1 {
+        for y in v1.1..=v2.1 {
             coords.extend((curx1 as u32..=curx2 as u32).map(|x| (x, y as u32)));
             curx1 += invslope1;
             curx2 += invslope2;
