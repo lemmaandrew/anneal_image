@@ -12,19 +12,19 @@ fn get_triangle(vertices: &mut [(u32, u32); 3]) -> (Vec<(u32, u32)>, Rgb<u8>) {
         if v1.1 == v2.1 && v1.0 > v2.0 {
             swap(v1, v2);
         }
-        if v1.1 > v2.1 {
+        else if v1.1 > v2.1 {
             swap(v1, v2);
         }
         if v2.1 == v3.1 && v2.0 > v3.0 {
             swap(v2, v3);
         }
-        if v2.1 > v3.1 {
+        else if v2.1 > v3.1 {
             swap(v2, v3);
         }
         if v1.1 == v2.1 && v1.0 > v2.0 {
             swap(v1, v2);
         }
-        if v1.1 > v2.1 {
+        else if v1.1 > v2.1 {
             swap(v1, v2);
         }
     }
@@ -61,7 +61,6 @@ fn get_triangle(vertices: &mut [(u32, u32); 3]) -> (Vec<(u32, u32)>, Rgb<u8>) {
 
     let mut vertices = vertices.map(|(x, y)| (x as i64, y as i64));
     sort_vertices(&mut vertices);
-    //vertices.sort_by_key(|v| (v.1, v.0));
     let [vt1, vt2, vt3] = vertices;
     let color: Rgb<u8> = Rgb([random(), random(), random()]);
 
