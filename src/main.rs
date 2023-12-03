@@ -1,5 +1,5 @@
 use clap::Parser;
-use image::{open, ImageBuffer, Rgb, RgbImage};
+use image::{open, ImageBuffer, Rgb, RgbImage, GenericImageView};
 use rand::random;
 use rayon::prelude::*;
 use std::{iter::zip, time::Instant};
@@ -65,8 +65,7 @@ fn get_triangle(vertices: &mut [(u32, u32); 3]) -> (Vec<(u32, u32)>, Rgb<u8>) {
     }
 }
 
-/// Draws a random single-colored rectangle on the image at given coordinates.
-/// Returns the pixels that were modified (coordinates and original colors) and the random color.
+/// Gets the coordinates of a random single-colored rectangle with the given vertices.
 fn get_rectangle(top_left: (u32, u32), bottom_right: (u32, u32)) -> (Vec<(u32, u32)>, Rgb<u8>) {
     let color = Rgb([random(), random(), random()]);
     let mut coords = Vec::new();
@@ -78,8 +77,7 @@ fn get_rectangle(top_left: (u32, u32), bottom_right: (u32, u32)) -> (Vec<(u32, u
     (coords, color)
 }
 
-/// Draw a rectangle on the given image at a random location with a random color.
-/// Returns the color and the top-left and bottom-right vertices of the rectangle
+/// Gets the coordinates and the color for the updated image
 fn get_neighbor(
     image: &mut ImageBuffer<Rgb<u8>, Vec<u8>>,
     triangle: bool,
@@ -259,6 +257,7 @@ fn anneal(
         let cost_diff = neighbor_cost - cost;
         if cost_diff < 0.0 || random::<f64>() < (-cost_diff / current_temp).exp() {
             cost = neighbor_cost;
+            // changing colors on the image to match the neighboring image
             for (x, y) in coords.iter() {
                 image.put_pixel(*x, *y, new_color);
             }
