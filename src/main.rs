@@ -2,12 +2,33 @@ use clap::Parser;
 use image::{open, Rgb};
 use rand::random;
 use rayon::prelude::*;
-use std::{iter::zip, time::Instant};
+use std::{iter::zip, time::Instant, mem::swap};
 
 /// Gets the coordinates of a random single-colored triangle with the given vertices.
 /// Returns said coordinates and the random color that it should be filled with
 /// Algorithm stolen from http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html
 fn get_triangle(vertices: &mut [(u32, u32); 3]) -> (Vec<(u32, u32)>, Rgb<u8>) {
+    fn sort_vertices([v1, v2, v3]: &mut [(i64, i64); 3]) {
+        if v1.1 == v2.1 && v1.0 > v2.0 {
+            swap(v1, v2);
+        }
+        if v1.1 > v2.1 {
+            swap(v1, v2);
+        }
+        if v2.1 == v3.1 && v2.0 > v3.0 {
+            swap(v2, v3);
+        }
+        if v2.1 > v3.1 {
+            swap(v2, v3);
+        }
+        if v1.1 == v2.1 && v1.0 > v2.0 {
+            swap(v1, v2);
+        }
+        if v1.1 > v2.1 {
+            swap(v1, v2);
+        }
+    }
+
     fn flat_bottom_triangle([v1, v2, v3]: &[(i64, i64); 3]) -> Vec<(u32, u32)> {
         let invslope1 = (v2.0 - v1.0) as f64 / (v2.1 - v1.1) as f64;
         let invslope2 = (v3.0 - v1.0) as f64 / (v3.1 - v1.1) as f64;
@@ -38,10 +59,10 @@ fn get_triangle(vertices: &mut [(u32, u32); 3]) -> (Vec<(u32, u32)>, Rgb<u8>) {
         coords
     }
 
-    vertices.sort_by_key(|v| (v.1, v.0));
-    let vt1 = (vertices[0].0 as i64, vertices[0].1 as i64);
-    let vt2 = (vertices[1].0 as i64, vertices[1].1 as i64);
-    let vt3 = (vertices[2].0 as i64, vertices[2].1 as i64);
+    let mut vertices = vertices.map(|(x, y)| (x as i64, y as i64));
+    sort_vertices(&mut vertices);
+    //vertices.sort_by_key(|v| (v.1, v.0));
+    let [vt1, vt2, vt3] = vertices;
     let color: Rgb<u8> = Rgb([random(), random(), random()]);
 
     if vt2.1 == vt3.1 {
@@ -56,9 +77,9 @@ fn get_triangle(vertices: &mut [(u32, u32); 3]) -> (Vec<(u32, u32)>, Rgb<u8>) {
             as i64;
         let vt4 = (x4, vt2.1);
         let mut flat_bottom = [vt1, vt2, vt4];
-        flat_bottom.sort_by_key(|v| (v.1, v.0));
+        sort_vertices(&mut flat_bottom);
         let mut flat_top = [vt2, vt4, vt3];
-        flat_top.sort_by_key(|v| (v.1, v.0));
+        sort_vertices(&mut flat_top);
         coords.extend(flat_bottom_triangle(&flat_bottom));
         coords.extend(flat_top_triangle(&flat_top));
         (coords, color)
