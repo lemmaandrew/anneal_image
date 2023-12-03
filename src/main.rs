@@ -1,5 +1,5 @@
 use clap::Parser;
-use image::{open, ImageBuffer, Rgb, RgbImage, GenericImageView};
+use image::{open, Rgb};
 use rand::random;
 use rayon::prelude::*;
 use std::{iter::zip, time::Instant};
@@ -79,10 +79,11 @@ fn get_rectangle(top_left: (u32, u32), bottom_right: (u32, u32)) -> (Vec<(u32, u
 
 /// Gets the coordinates and the color for the updated image
 fn get_neighbor(
-    image: &mut ImageBuffer<Rgb<u8>, Vec<u8>>,
+    image: &mut Vec<Vec<Rgb<u8>>>,
     triangle: bool,
 ) -> (Vec<(u32, u32)>, Rgb<u8>) {
-    let (w, h) = image.dimensions();
+    let w = image.len() as u32;
+    let h = image[0].len() as u32;
     if !triangle {
         let bottom_right = (random::<u32>() % (w + 1), random::<u32>() % (h + 1));
         // if `bottom_right` contains any 0s, we must account for that
@@ -125,15 +126,16 @@ fn pixel_difference(pixel1: Rgb<u8>, pixel2: Rgb<u8>) -> u64 {
 
 /// RMSE difference between the original image and the generated image
 fn get_cost(
-    original_image: &ImageBuffer<Rgb<u8>, Vec<u8>>,
-    generated_image: &ImageBuffer<Rgb<u8>, Vec<u8>>,
+    original_image: &Vec<Vec<Rgb<u8>>>,
+    generated_image: &Vec<Vec<Rgb<u8>>>,
 ) -> f64 {
-    let (w, h) = original_image.dimensions();
+    let w = original_image.len();
+    let h = original_image[0].len();
     let mut s = 0;
     for x in 0..w {
         for y in 0..h {
-            let &pixel1 = original_image.get_pixel(x, y);
-            let &pixel2 = generated_image.get_pixel(x, y);
+            let pixel1 = original_image[x][y];
+            let pixel2 = generated_image[x][y];
             s += pixel_difference(pixel1, pixel2);
         }
     }
@@ -149,8 +151,8 @@ fn get_cost(
 /// and then calculates the new distance result
 fn update_cost(
     previous_cost: f64,
-    original_image: &ImageBuffer<Rgb<u8>, Vec<u8>>,
-    annealed_image: &ImageBuffer<Rgb<u8>, Vec<u8>>,
+    original_image: &Vec<Vec<Rgb<u8>>>,
+    annealed_image: &Vec<Vec<Rgb<u8>>>,
     coords: &Vec<(u32, u32)>,
     new_color: Rgb<u8>,
     sample: Option<u32>,
@@ -159,7 +161,8 @@ fn update_cost(
     if coords.len() == 0 {
         return previous_cost;
     }
-    let (w, h) = original_image.dimensions();
+    let w = original_image.len();
+    let h = original_image[0].len();
     // restoring the sum from `get_cost`
     let mut s = (previous_cost * previous_cost * (w * h * 3) as f64).sqrt();
     match sample {
@@ -168,11 +171,11 @@ fn update_cost(
             // because apparently `get_pixel` is an expensive operation??
             let original_pixels = coords
                 .par_iter()
-                .map(|(x, y)| *original_image.get_pixel(*x, *y))
+                .map(|(x, y)| original_image[*x as usize][*y as usize])
                 .collect::<Vec<Rgb<u8>>>();
             let annealed_pixels = coords
                 .par_iter()
-                .map(|(x, y)| *annealed_image.get_pixel(*x, *y))
+                .map(|(x, y)| annealed_image[*x as usize][*y as usize])
                 .collect::<Vec<Rgb<u8>>>();
             // subtracting off the relevant pixels from the first generated image.
             s -= (0..original_pixels.len())
@@ -197,13 +200,13 @@ fn update_cost(
                     .iter()
                     .map(|&i| {
                         let (x, y) = coords[i];
-                        *original_image.get_pixel(x, y)
+                        original_image[x as usize][y as usize]
                     })
                     .collect::<Vec<Rgb<u8>>>()
             } else {
                 coords
                     .iter()
-                    .map(|(x, y)| *original_image.get_pixel(*x, *y))
+                    .map(|(x, y)| original_image[*x as usize][*y as usize])
                     .collect::<Vec<Rgb<u8>>>()
             };
             // sampling the old pixels
@@ -212,13 +215,13 @@ fn update_cost(
                     .iter()
                     .map(|&i| {
                         let (x, y) = coords[i];
-                        *annealed_image.get_pixel(x, y)
+                        annealed_image[x as usize][y as usize]
                     })
                     .collect::<Vec<Rgb<u8>>>()
             } else {
                 coords
                     .iter()
-                    .map(|(x, y)| *annealed_image.get_pixel(*x, *y))
+                    .map(|(x, y)| annealed_image[*x as usize][*y as usize])
                     .collect::<Vec<Rgb<u8>>>()
             };
             // subtracting off the pixel differences between the original image and the old pixels
@@ -239,15 +242,15 @@ fn update_cost(
 
 /// Simulated annealing algorithm to approximate a given image
 fn anneal(
-    original_image: &ImageBuffer<Rgb<u8>, Vec<u8>>,
+    original_image: &Vec<Vec<Rgb<u8>>>,
     alpha: f64,
     triangle: bool,
     sample: Option<u32>,
-) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
+) -> Vec<Vec<Rgb<u8>>> {
     let initial_temp = 1e3;
     let final_temp = 0.001;
     let mut current_temp = initial_temp;
-    let mut image = RgbImage::new(original_image.dimensions().0, original_image.dimensions().1);
+    let mut image = vec![vec![Rgb([0u8, 0u8, 0u8]); original_image[0].len()]; original_image.len()];
     let mut cost = get_cost(&original_image, &image);
 
     let total_time_start = Instant::now();
@@ -259,7 +262,7 @@ fn anneal(
             cost = neighbor_cost;
             // changing colors on the image to match the neighboring image
             for (x, y) in coords.iter() {
-                image.put_pixel(*x, *y, new_color);
+                image[*x as usize][*y as usize] = new_color;
             }
         }
         current_temp *= alpha;
@@ -300,7 +303,20 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
-    let original_image = open(args.input).unwrap().into_rgb8();
-    let generated_image = anneal(&original_image, args.alpha, args.triangle, args.sample);
-    generated_image.save(args.output).unwrap();
+    let mut original_image = open(args.input).unwrap().into_rgb8();
+    let mut original_pixels = Vec::new();
+    for x in 0..original_image.width() {
+        let mut column = Vec::new();
+        for y in 0..original_image.height() {
+            column.push(*original_image.get_pixel(x, y));
+        }
+        original_pixels.push(column);
+    }
+    let generated_image = anneal(&original_pixels, args.alpha, args.triangle, args.sample);
+    for x in 0..generated_image.len() {
+        for y in 0..generated_image[0].len() {
+            original_image.put_pixel(x as u32, y as u32, generated_image[x][y]);
+        }
+    }
+    original_image.save(args.output).unwrap();
 }
