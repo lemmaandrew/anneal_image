@@ -9,22 +9,13 @@ use std::{iter::zip, time::Instant, mem::swap};
 /// Algorithm stolen from http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html
 fn get_triangle(vertices: &mut [(u32, u32); 3]) -> (Vec<(u32, u32)>, Rgb<u8>) {
     fn sort_vertices([v1, v2, v3]: &mut [(i64, i64); 3]) {
-        if v1.1 == v2.1 && v1.0 > v2.0 {
+        if v1.1 > v2.1 || v1.1 == v2.1 && v1.0 > v2.0 {
             swap(v1, v2);
         }
-        else if v1.1 > v2.1 {
-            swap(v1, v2);
-        }
-        if v2.1 == v3.1 && v2.0 > v3.0 {
+        if v2.1 > v3.1 || v2.1 == v3.1 && v2.0 > v3.0 {
             swap(v2, v3);
         }
-        else if v2.1 > v3.1 {
-            swap(v2, v3);
-        }
-        if v1.1 == v2.1 && v1.0 > v2.0 {
-            swap(v1, v2);
-        }
-        else if v1.1 > v2.1 {
+        if v1.1 > v2.1 || v1.1 == v2.1 && v1.0 > v2.0 {
             swap(v1, v2);
         }
     }
