@@ -261,10 +261,10 @@ fn anneal(
     let initial_temp = 1e3;
     let final_temp = 0.001;
     let mut current_temp = initial_temp;
+    let total_time_start = Instant::now();
     let mut image = vec![vec![Rgb([0u8, 0u8, 0u8]); original_image[0].len()]; original_image.len()];
     let mut cost = get_cost(&original_image, &image);
 
-    let total_time_start = Instant::now();
     while current_temp >= final_temp {
         let (coords, new_color) = get_neighbor(&mut image, triangle);
         let neighbor_cost = update_cost(cost, original_image, &image, &coords, new_color, sample);
