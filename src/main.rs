@@ -2,7 +2,7 @@ use clap::Parser;
 use image::{open, Rgb};
 use rand::random;
 use rayon::prelude::*;
-use std::{iter::zip, time::Instant, mem::swap};
+use std::{iter::zip, mem::swap, time::Instant};
 
 /// Gets the coordinates of a random single-colored triangle with the given vertices.
 /// Returns said coordinates and the random color that it should be filled with
@@ -89,25 +89,14 @@ fn get_rectangle(top_left: (u32, u32), bottom_right: (u32, u32)) -> (Vec<(u32, u
 }
 
 /// Gets the coordinates and the color for the updated image
-fn get_neighbor(
-    image: &mut Vec<Vec<Rgb<u8>>>,
-    triangle: bool,
-) -> (Vec<(u32, u32)>, Rgb<u8>) {
+fn get_neighbor(image: &mut Vec<Vec<Rgb<u8>>>, triangle: bool) -> (Vec<(u32, u32)>, Rgb<u8>) {
     let w = image.len() as u32;
     let h = image[0].len() as u32;
     if !triangle {
-        let bottom_right = (random::<u32>() % (w + 1), random::<u32>() % (h + 1));
+        let bottom_right = (1 + random::<u32>() % w, 1 + random::<u32>() % h);
         // if `bottom_right` contains any 0s, we must account for that
         // because we can't perform `n % 0`
-        let top_left = match bottom_right {
-            (0, 0) => (0, 0),
-            (0, y2) => (0, random::<u32>() % y2),
-            (x2, 0) => (random::<u32>() % x2, 0),
-            _ => (
-                random::<u32>() % bottom_right.0,
-                random::<u32>() % bottom_right.1,
-            ),
-        };
+        let top_left = (random::<u32>() % bottom_right.0, random::<u32>() % bottom_right.1);
         get_rectangle(top_left, bottom_right)
     } else {
         let v1 = (random::<u32>() % w, random::<u32>() % h);
@@ -136,10 +125,7 @@ fn pixel_difference(pixel1: Rgb<u8>, pixel2: Rgb<u8>) -> u64 {
 }
 
 /// RMSE difference between the original image and the generated image
-fn get_cost(
-    original_image: &Vec<Vec<Rgb<u8>>>,
-    generated_image: &Vec<Vec<Rgb<u8>>>,
-) -> f64 {
+fn get_cost(original_image: &Vec<Vec<Rgb<u8>>>, generated_image: &Vec<Vec<Rgb<u8>>>) -> f64 {
     let w = original_image.len();
     let h = original_image[0].len();
     let mut s = 0;
