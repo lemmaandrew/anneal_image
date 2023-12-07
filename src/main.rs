@@ -12,7 +12,7 @@ use std::{
 /// Gets the coordinates of a random single-colored triangle with the given vertices.
 /// Returns said coordinates and the random color that it should be filled with
 /// Algorithm stolen from http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html
-fn get_triangle(vertices: &mut [(u32, u32); 3]) -> (Vec<(u32, u32)>, Rgb<u8>) {
+fn get_triangle(vertices: &mut [(usize, usize); 3]) -> (Vec<(usize, usize)>, Rgb<u8>) {
     fn sort_vertices([v1, v2, v3]: &mut [(i64, i64); 3]) {
         if v1.1 > v2.1 || v1.1 == v2.1 && v1.0 > v2.0 {
             swap(v1, v2);
@@ -25,14 +25,14 @@ fn get_triangle(vertices: &mut [(u32, u32); 3]) -> (Vec<(u32, u32)>, Rgb<u8>) {
         }
     }
 
-    fn flat_bottom_triangle([v1, v2, v3]: &[(i64, i64); 3]) -> Vec<(u32, u32)> {
+    fn flat_bottom_triangle([v1, v2, v3]: &[(i64, i64); 3]) -> Vec<(usize, usize)> {
         let invslope1 = (v2.0 - v1.0) as f64 / (v2.1 - v1.1) as f64;
         let invslope2 = (v3.0 - v1.0) as f64 / (v3.1 - v1.1) as f64;
         let mut curx1 = v1.0 as f64;
         let mut curx2 = v1.0 as f64;
         let mut coords = Vec::new();
         for y in v1.1..=v2.1 {
-            coords.extend((curx1 as u32..=curx2 as u32).map(|x| (x, y as u32)));
+            coords.extend((curx1 as usize..=curx2 as usize).map(|x| (x, y as usize)));
             curx1 += invslope1;
             curx2 += invslope2;
         }
@@ -40,14 +40,14 @@ fn get_triangle(vertices: &mut [(u32, u32); 3]) -> (Vec<(u32, u32)>, Rgb<u8>) {
         coords
     }
 
-    fn flat_top_triangle([v1, v2, v3]: &[(i64, i64); 3]) -> Vec<(u32, u32)> {
+    fn flat_top_triangle([v1, v2, v3]: &[(i64, i64); 3]) -> Vec<(usize, usize)> {
         let invslope1 = (v3.0 - v1.0) as f64 / (v3.1 - v1.1) as f64;
         let invslope2 = (v3.0 - v2.0) as f64 / (v3.1 - v2.1) as f64;
         let mut curx1 = v3.0 as f64;
         let mut curx2 = v3.0 as f64;
         let mut coords = Vec::new();
         for y in (v1.1 + 1..=v3.1).rev() {
-            coords.extend((curx1 as u32..=curx2 as u32).map(|x| (x, y as u32)));
+            coords.extend((curx1 as usize..=curx2 as usize).map(|x| (x, y as usize)));
             curx1 -= invslope1;
             curx2 -= invslope2;
         }
@@ -84,7 +84,7 @@ fn get_triangle(vertices: &mut [(u32, u32); 3]) -> (Vec<(u32, u32)>, Rgb<u8>) {
 }
 
 /// Gets the coordinates of a random single-colored rectangle with the given vertices.
-fn get_rectangle(top_left: (u32, u32), bottom_right: (u32, u32)) -> (Vec<(u32, u32)>, Rgb<u8>) {
+fn get_rectangle(top_left: (usize, usize), bottom_right: (usize, usize)) -> (Vec<(usize, usize)>, Rgb<u8>) {
     let color = Rgb([random(), random(), random()]);
     let mut coords = Vec::new();
     for x in top_left.0..bottom_right.0 {
@@ -96,20 +96,20 @@ fn get_rectangle(top_left: (u32, u32), bottom_right: (u32, u32)) -> (Vec<(u32, u
 }
 
 /// Gets the coordinates and the color for the updated image
-fn get_neighbor(image: &mut Vec<Vec<Rgb<u8>>>, triangle: bool) -> (Vec<(u32, u32)>, Rgb<u8>) {
-    let w = image.len() as u32;
-    let h = image[0].len() as u32;
+fn get_neighbor(image: &mut Vec<Vec<Rgb<u8>>>, triangle: bool) -> (Vec<(usize, usize)>, Rgb<u8>) {
+    let w = image.len();
+    let h = image[0].len();
     if !triangle {
-        let bottom_right = (1 + random::<u32>() % w, 1 + random::<u32>() % h);
+        let bottom_right = (1 + random::<usize>() % w, 1 + random::<usize>() % h);
         let top_left = (
-            random::<u32>() % bottom_right.0,
-            random::<u32>() % bottom_right.1,
+            random::<usize>() % bottom_right.0,
+            random::<usize>() % bottom_right.1,
         );
         get_rectangle(top_left, bottom_right)
     } else {
-        let v1 = (random::<u32>() % w, random::<u32>() % h);
-        let v2 = (random::<u32>() % w, random::<u32>() % h);
-        let v3 = (random::<u32>() % w, random::<u32>() % h);
+        let v1 = (random::<usize>() % w, random::<usize>() % h);
+        let v2 = (random::<usize>() % w, random::<usize>() % h);
+        let v3 = (random::<usize>() % w, random::<usize>() % h);
         // ensuring we have a valid triangle
         if v1 == v2
             || v2 == v3
@@ -158,7 +158,7 @@ fn update_cost(
     previous_cost: f64,
     original_image: &Vec<Vec<Rgb<u8>>>,
     annealed_image: &Vec<Vec<Rgb<u8>>>,
-    coords: &Vec<(u32, u32)>,
+    coords: &Vec<(usize, usize)>,
     new_color: Rgb<u8>,
     sample: Option<u32>,
 ) -> f64 {
