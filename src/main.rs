@@ -2,7 +2,12 @@ use clap::Parser;
 use image::{open, Rgb};
 use rand::random;
 use rayon::prelude::*;
-use std::{iter::zip, mem::swap, time::Instant};
+use std::{
+    iter::zip,
+    mem::swap,
+    thread,
+    time::Instant,
+};
 
 /// Gets the coordinates of a random single-colored triangle with the given vertices.
 /// Returns said coordinates and the random color that it should be filled with
@@ -70,8 +75,10 @@ fn get_triangle(vertices: &mut [(u32, u32); 3]) -> (Vec<(u32, u32)>, Rgb<u8>) {
         sort_vertices(&mut flat_bottom);
         let mut flat_top = [vt2, vt4, vt3];
         sort_vertices(&mut flat_top);
-        coords.extend(flat_bottom_triangle(&flat_bottom));
-        coords.extend(flat_top_triangle(&flat_top));
+        let flat_bottom_handle = thread::spawn(move || flat_bottom_triangle(&flat_bottom));
+        let flat_top_handle = thread::spawn(move || flat_top_triangle(&flat_top));
+        coords.extend(flat_bottom_handle.join().unwrap());
+        coords.extend(flat_top_handle.join().unwrap());
         (coords, color)
     }
 }
@@ -94,9 +101,10 @@ fn get_neighbor(image: &mut Vec<Vec<Rgb<u8>>>, triangle: bool) -> (Vec<(u32, u32
     let h = image[0].len() as u32;
     if !triangle {
         let bottom_right = (1 + random::<u32>() % w, 1 + random::<u32>() % h);
-        // if `bottom_right` contains any 0s, we must account for that
-        // because we can't perform `n % 0`
-        let top_left = (random::<u32>() % bottom_right.0, random::<u32>() % bottom_right.1);
+        let top_left = (
+            random::<u32>() % bottom_right.0,
+            random::<u32>() % bottom_right.1,
+        );
         get_rectangle(top_left, bottom_right)
     } else {
         let v1 = (random::<u32>() % w, random::<u32>() % h);
