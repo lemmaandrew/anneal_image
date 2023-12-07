@@ -2,12 +2,7 @@ use clap::Parser;
 use image::{open, Rgb};
 use rand::random;
 use rayon::prelude::*;
-use std::{
-    iter::zip,
-    mem::swap,
-    thread,
-    time::Instant,
-};
+use std::{iter::zip, mem::swap, time::Instant};
 
 /// Gets the coordinates of a random single-colored triangle with the given vertices.
 /// Returns said coordinates and the random color that it should be filled with
@@ -75,16 +70,17 @@ fn get_triangle(vertices: &mut [(usize, usize); 3]) -> (Vec<(usize, usize)>, Rgb
         sort_vertices(&mut flat_bottom);
         let mut flat_top = [vt2, vt4, vt3];
         sort_vertices(&mut flat_top);
-        let flat_bottom_handle = thread::spawn(move || flat_bottom_triangle(&flat_bottom));
-        let flat_top_handle = thread::spawn(move || flat_top_triangle(&flat_top));
-        coords.extend(flat_bottom_handle.join().unwrap());
-        coords.extend(flat_top_handle.join().unwrap());
+        coords.extend(flat_bottom_triangle(&flat_bottom));
+        coords.extend(flat_top_triangle(&flat_top));
         (coords, color)
     }
 }
 
 /// Gets the coordinates of a random single-colored rectangle with the given vertices.
-fn get_rectangle(top_left: (usize, usize), bottom_right: (usize, usize)) -> (Vec<(usize, usize)>, Rgb<u8>) {
+fn get_rectangle(
+    top_left: (usize, usize),
+    bottom_right: (usize, usize),
+) -> (Vec<(usize, usize)>, Rgb<u8>) {
     let color = Rgb([random(), random(), random()]);
     let mut coords = Vec::new();
     for x in top_left.0..bottom_right.0 {
