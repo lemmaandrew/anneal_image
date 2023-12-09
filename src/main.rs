@@ -2,7 +2,13 @@ use clap::Parser;
 use image::{open, Rgb};
 use rand::random;
 use rayon::prelude::*;
-use std::{iter::zip, mem::swap, time::Instant};
+use std::{
+    iter::zip,
+    mem::swap,
+    sync::{Arc, Mutex},
+    thread,
+    time::Instant,
+};
 
 /// Gets the coordinates of a random single-colored triangle with the given vertices.
 /// Returns said coordinates and the random color that it should be filled with
@@ -241,8 +247,8 @@ fn update_cost(
     dist
 }
 
-/// Simulated annealing algorithm to approximate a given image
-fn anneal(
+/// Simulated annealing algorithm (single threaded) to approximate a given image
+fn anneal_single_threaded(
     original_image: &Vec<Vec<Rgb<u8>>>,
     alpha: f64,
     triangle: bool,
@@ -275,7 +281,72 @@ fn anneal(
         "\ntotal time elapsed: {} seconds",
         total_time_elapsed.as_secs_f64()
     );
+
     image
+}
+
+/// Simulated annealing algorithm with some multithreading to approximate a given image
+fn anneal_multithreaded(
+    original_image: &Vec<Vec<Rgb<u8>>>,
+    alpha: f64,
+    triangle: bool,
+    sample: Option<u32>,
+) -> Vec<Vec<Rgb<u8>>> {
+    let initial_temp = 1e3;
+    let final_temp = 0.001;
+    let available_parallelism = usize::from(thread::available_parallelism().unwrap());
+    let mut current_temp = initial_temp;
+    let total_time_start = Instant::now();
+    let image = Arc::new(Mutex::new(vec![
+        vec![
+            Rgb([0u8, 0u8, 0u8]);
+            original_image[0].len()
+        ];
+        original_image.len()
+    ]));
+    let mut cost = get_cost(&original_image, &image.lock().unwrap());
+
+    while current_temp >= final_temp {
+        let (coords, new_color) = get_neighbor(&mut image.lock().unwrap(), triangle);
+        let neighbor_cost = update_cost(
+            cost,
+            original_image,
+            &image.lock().unwrap(),
+            &coords,
+            new_color,
+            sample,
+        );
+        let cost_diff = neighbor_cost - cost;
+        if cost_diff < 0.0 || random::<f64>() < (-cost_diff / current_temp).exp() {
+            cost = neighbor_cost;
+            // changing colors on the image to match the neighboring image
+            let coord_chunks = coords.chunks((coords.len() / available_parallelism).max(1));
+            thread::scope(|s| {
+                for chunk in coord_chunks {
+                    let image = Arc::clone(&image);
+                    s.spawn(move || {
+                        let mut image = image.lock().unwrap();
+                        for (x, y) in chunk {
+                            image[*x][*y] = new_color;
+                        }
+                    });
+                }
+            });
+            //for (x, y) in coords.iter() {
+            //    image.lock().unwrap()[*x as usize][*y as usize] = new_color;
+            //}
+        }
+        current_temp *= alpha;
+        print!("temperature: {current_temp}\r",);
+    }
+
+    let total_time_elapsed = total_time_start.elapsed();
+    println!(
+        "\ntotal time elapsed: {} seconds",
+        total_time_elapsed.as_secs_f64()
+    );
+
+    Arc::try_unwrap(image).unwrap().into_inner().unwrap()
 }
 
 #[derive(Parser)]
@@ -296,6 +367,10 @@ struct Args {
     #[arg(short, long)]
     triangle: bool,
 
+    /// Flag for enabling multithreading
+    #[arg(short, long)]
+    multithreading: bool,
+
     /// Randomly sample pixels for cost calculation.
     /// Much faster than non-sampled, at the cost of loss of accuracy
     #[arg(short, long)]
@@ -313,7 +388,11 @@ fn main() {
         }
         original_pixels.push(column);
     }
-    let generated_image = anneal(&original_pixels, args.alpha, args.triangle, args.sample);
+    let generated_image = if args.multithreading {
+        anneal_multithreaded(&original_pixels, args.alpha, args.triangle, args.sample)
+    } else {
+        anneal_single_threaded(&original_pixels, args.alpha, args.triangle, args.sample)
+    };
     for x in 0..generated_image.len() {
         for y in 0..generated_image[0].len() {
             original_image.put_pixel(x as u32, y as u32, generated_image[x][y]);
