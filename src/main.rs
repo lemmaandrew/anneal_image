@@ -98,7 +98,7 @@ fn get_rectangle(
 }
 
 /// Gets the coordinates and the color for the updated image
-fn get_neighbor(image: &mut Vec<Vec<Rgb<u8>>>, triangle: bool) -> (Vec<(usize, usize)>, Rgb<u8>) {
+fn get_neighbor(image: &Vec<Vec<Rgb<u8>>>, triangle: bool) -> (Vec<(usize, usize)>, Rgb<u8>) {
     let w = image.len();
     let h = image[0].len();
     if !triangle {
@@ -262,7 +262,7 @@ fn anneal_single_threaded(
     let mut cost = get_cost(&original_image, &image);
 
     while current_temp >= final_temp {
-        let (coords, new_color) = get_neighbor(&mut image, triangle);
+        let (coords, new_color) = get_neighbor(&image, triangle);
         let neighbor_cost = update_cost(cost, original_image, &image, &coords, new_color, sample);
         let cost_diff = neighbor_cost - cost;
         if cost_diff < 0.0 || random::<f64>() < (-cost_diff / current_temp).exp() {
@@ -307,7 +307,7 @@ fn anneal_multithreaded(
     let mut cost = get_cost(&original_image, &image.lock().unwrap());
 
     while current_temp >= final_temp {
-        let (coords, new_color) = get_neighbor(&mut image.lock().unwrap(), triangle);
+        let (coords, new_color) = get_neighbor(&image.lock().unwrap(), triangle);
         let neighbor_cost = update_cost(
             cost,
             original_image,
@@ -332,9 +332,6 @@ fn anneal_multithreaded(
                     });
                 }
             });
-            //for (x, y) in coords.iter() {
-            //    image.lock().unwrap()[*x as usize][*y as usize] = new_color;
-            //}
         }
         current_temp *= alpha;
         print!("temperature: {current_temp}\r",);
