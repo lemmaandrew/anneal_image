@@ -266,6 +266,7 @@ fn anneal(
     let final_temp = 0.001;
     let available_parallelism = usize::from(thread::available_parallelism().unwrap());
     let mut current_temp = initial_temp;
+    let total_loops = -(1e6f64).log(alpha);
     let total_time_start = Instant::now();
     let mut image = {
         let raw = vec![vec![Rgb([0u8, 0u8, 0u8]); original_image[0].len()]; original_image.len()];
@@ -282,7 +283,10 @@ fn anneal(
         EitherThreadedImage::SingleThreaded(ref raw) => get_cost(&original_image, &raw),
     };
 
+    let mut time_elapsed = total_time_start.elapsed();
+    let mut num_loops = 0.0;
     while current_temp >= final_temp {
+        let loop_start = Instant::now();
         let (coords, new_color) = match image {
             EitherThreadedImage::MultiThreaded(ref guard) => {
                 get_neighbor(&guard.lock().unwrap(), triangle)
@@ -329,13 +333,26 @@ fn anneal(
             };
         }
         current_temp *= alpha;
-        print!("temperature: {current_temp}\r",);
+        num_loops += 1.0;
+        let loop_end = loop_start.elapsed();
+        time_elapsed += loop_end;
+        print!(
+            concat!(
+                "temperature: {:.5}",
+                " | time elapsed: {:.5}",
+                " | time this loop: {:.5}",
+                " | estimated time remaining: {:.5}           \r"
+            ),
+            current_temp,
+            time_elapsed.as_secs_f64(),
+            loop_end.as_secs_f64(),
+            (total_loops - num_loops) * time_elapsed.as_secs_f64() / num_loops
+        );
     }
 
-    let total_time_elapsed = total_time_start.elapsed();
     println!(
         "\ntotal time elapsed: {} seconds",
-        total_time_elapsed.as_secs_f64()
+        time_elapsed.as_secs_f64()
     );
 
     match image {
