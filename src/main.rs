@@ -392,11 +392,6 @@ fn main() {
         args.sample,
         args.multithreading,
     );
-    //let generated_image = if args.multithreading {
-    //    anneal_multithreaded(&original_pixels, args.alpha, args.triangle, args.sample)
-    //} else {
-    //    anneal_single_threaded(&original_pixels, args.alpha, args.triangle, args.sample)
-    //};
     for x in 0..generated_image.len() {
         for y in 0..generated_image[0].len() {
             original_image.put_pixel(x as u32, y as u32, generated_image[x][y]);
