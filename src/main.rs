@@ -339,9 +339,9 @@ fn anneal(
         print!(
             concat!(
                 "temperature: {:.5}",
-                " | time elapsed: {:.5}",
-                " | time this loop: {:.5}",
-                " | estimated time remaining: {:.5}           \r"
+                " | seconds elapsed: {:.5}",
+                " | seconds this loop: {:.5}",
+                " | estimated seconds remaining: {:.5}           \r"
             ),
             current_temp,
             time_elapsed.as_secs_f64(),
@@ -393,6 +393,9 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
+    if !(0.0 < args.alpha && args.alpha < 1.0) {
+        panic!("alpha must be greater than 0 and less than 1");
+    }
     let mut original_image = open(args.input).unwrap().into_rgb8();
     let mut original_pixels = Vec::new();
     for x in 0..original_image.width() {
